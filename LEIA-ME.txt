@@ -1,0 +1,105 @@
+═══════════════════════════════════════════════════════════════
+    MIGRADOR PEP - Sistema de Migração Automática
+═══════════════════════════════════════════════════════════════
+
+📖 INSTRUÇÕES RÁPIDAS PARA INICIANTES
+═══════════════════════════════════════════════════════════════
+
+1️⃣  INSTALAÇÃO (Faça apenas uma vez)
+───────────────────────────────────────────────────────────────
+
+   macOS/Linux:
+   • Duplo clique em: instalar.sh
+   • Ou abra o Terminal e execute: ./instalar.sh
+
+   Windows:
+   • Duplo clique em: instalar.bat
+   • Ou abra o Prompt de Comando e execute: instalar.bat
+
+   ⏱️  A instalação leva cerca de 2-5 minutos
+
+
+2️⃣  USAR O SISTEMA
+───────────────────────────────────────────────────────────────
+
+   Opção A - Interface Web (MAIS FÁCIL - RECOMENDADO):
+   
+   macOS/Linux:
+   • Duplo clique em: executar_web.sh
+   • Ou execute: ./executar_web.sh
+   
+   Windows:
+   • Duplo clique em: executar_web.bat
+   
+   Depois:
+   • Abra seu navegador (Chrome, Firefox, Safari)
+   • Acesse: http://localhost:5000
+   • Use a interface gráfica!
+
+
+   Opção B - Linha de Comando:
+   
+   python3 migrador_pep.py 664276 /caminho/para/pasta
+
+
+3️⃣  COMO USAR A INTERFACE WEB
+───────────────────────────────────────────────────────────────
+
+   1. Configure o "Diretório Base" (onde estão as pastas)
+      Exemplo: /Users/gabrielrosch/git/
+
+   2. Cole a lista de protocolos no formato:
+      664276  ATPS-23-LGS-012
+      701524  ATPS-23-LGS-051
+      (protocolo + dois espaços + nome da pasta)
+
+   3. Clique em "🚀 Iniciar Migração"
+
+   4. Acompanhe o progresso na tabela
+
+   5. Revise os formulários nas abas do navegador
+
+
+4️⃣  SOLUÇÃO DE PROBLEMAS
+───────────────────────────────────────────────────────────────
+
+   ❌ "python3: command not found"
+      → Instale Python 3: https://www.python.org/downloads/
+
+   ❌ "Erro ao iniciar"
+      → Execute a instalação novamente: ./instalar.sh
+
+   ❌ "Porta 5000 em uso"
+      → Feche outros programas ou reinicie o computador
+
+   ❌ "Pasta não encontrada"
+      → Verifique se o caminho está correto
+      → Use caminhos absolutos (completo desde / ou C:\)
+
+
+5️⃣  ARQUIVOS IMPORTANTES
+───────────────────────────────────────────────────────────────
+
+   📄 instalar.sh / instalar.bat
+      → Script de instalação (execute primeiro)
+
+   📄 executar_web.sh / executar_web.bat
+      → Inicia a interface web (use este para trabalhar)
+
+   📄 INSTRUCOES_INSTALACAO.md
+      → Instruções detalhadas de instalação
+
+   📄 README.md
+      → Documentação completa do projeto
+
+   📄 README_GUI.md
+      → Guia de uso da interface gráfica
+
+
+═══════════════════════════════════════════════════════════════
+   💡 DICA: Use sempre a Interface Web (executar_web)!
+   É mais fácil e visual para pessoas não técnicas.
+═══════════════════════════════════════════════════════════════
+
+Para mais ajuda, consulte: INSTRUCOES_INSTALACAO.md
+
