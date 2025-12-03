@@ -226,13 +226,11 @@ class MigradorPEP:
                 # Tenta pegar o valor via atributo value
                 value = await input_elem.get_attribute('value') or ''
             
-            # Captura campos mesmo se vazios (alguns campos podem ser importantes mesmo vazios)
-            # Mas prioriza campos com valor
-            if value or (name and ('descricao' in name.lower() or 'cabo' in name.lower() or 'gerais' in name.lower() or 'dados' in name.lower())):
-                if name:
-                    dados[name] = value or ''
-                elif id_attr:
-                    dados[id_attr] = value or ''
+            # Captura TODOS os campos (mesmo vazios) - importante para campos como Fabricante, Especificação, etc.
+            if name:
+                dados[name] = value or ''
+            elif id_attr:
+                dados[id_attr] = value or ''
         
         # Textareas (ignora campos de sistema)
         textareas = await page.query_selector_all('textarea')
@@ -249,24 +247,27 @@ class MigradorPEP:
             except:
                 value = ''
             
-            # Captura textareas mesmo se vazios (especialmente descrição do cabo e dados gerais)
-            if value or (name and ('descricao' in name.lower() or 'cabo' in name.lower() or 'gerais' in name.lower() or 'dados' in name.lower())):
-                if name:
-                    dados[name] = value or ''
-                elif id_attr:
-                    dados[id_attr] = value or ''
+            # Captura TODOS os textareas (mesmo vazios)
+            if name:
+                dados[name] = value or ''
+            elif id_attr:
+                dados[id_attr] = value or ''
         
-        # Selects (dropdowns)
+        # Selects (dropdowns) - captura TODOS, mesmo vazios
         selects = await page.query_selector_all('select')
         for select in selects:
             name = await select.get_attribute('name')
             id_attr = await select.get_attribute('id')
-            value = await select.evaluate('el => el.value')
-            if value:
-                if name:
-                    dados[name] = value
-                elif id_attr:
-                    dados[id_attr] = value
+            try:
+                value = await select.evaluate('el => el.value')
+            except:
+                value = ''
+            
+            # Captura TODOS os selects (mesmo vazios)
+            if name:
+                dados[name] = value or ''
+            elif id_attr:
+                dados[id_attr] = value or ''
         
         # Checkboxes e radios selecionados
         checkboxes = await page.query_selector_all('input[type="checkbox"]:checked, input[type="radio"]:checked')
@@ -580,28 +581,9 @@ class MigradorPEP:
                         print(f"    ⚠ Erro ao clicar no botão Incluir: {str(e)}")
                         logradouros_nao_encontrados.append(nome_logradouro)
                 else:
-                    print(f"    ❌ Logradouro NÃO encontrado no combo")
-                    # Tenta buscar em outros bairros usando a mesma referência
-                    print(f"    🔍 Tentando buscar em outros bairros do município...")
-                    encontrado_alternativo = await self.buscar_logradouro_em_todos_bairros(
-                        page, estado_ref, municipio_ref, nome_logradouro
-                    )
-                    
-                    if encontrado_alternativo:
-                        print(f"    ✅ Logradouro encontrado em outro bairro!")
-                        try:
-                            botao_incluir = await page.query_selector('button[name="form:tabs:j_idt227"]')
-                            if botao_incluir:
-                                await botao_incluir.click()
-                                await page.wait_for_timeout(2000)
-                                print(f"    ✓ Logradouro adicionado ao itinerário")
-                                logradouros_encontrados.append(nome_logradouro)
-                            else:
-                                logradouros_nao_encontrados.append(nome_logradouro)
-                        except Exception as e:
-                            logradouros_nao_encontrados.append(nome_logradouro)
-                    else:
-                        logradouros_nao_encontrados.append(nome_logradouro)
+                    # Não encontrou - apenas registra, não faz busca aprofundada
+                    print(f"    ⚠️ Logradouro '{nome_logradouro}' não encontrado (será deixado sem preencher)")
+                    logradouros_nao_encontrados.append(nome_logradouro)
                         
             except Exception as e:
                 # Não dispara erro, apenas registra que não foi encontrado
@@ -1092,7 +1074,9 @@ class MigradorPEP:
                 pass
         
         for campo, valor in dados.items():
-            if not valor:
+            # Não ignora campos vazios - alguns campos importantes podem estar vazios mas ainda precisam ser preenchidos
+            # Mas pula se o valor for None ou string vazia após conversão
+            if valor is None or (isinstance(valor, str) and not valor.strip()):
                 continue
             
             # Pula campos de cascata que já foram preenchidos e campos internos
@@ -1150,9 +1134,13 @@ class MigradorPEP:
                             if str(valor).lower() in ['true', '1', 'on', 'yes', 'sim']:
                                 await elemento.check()
                         else:
-                            await elemento.fill(str(valor))
+                            # Preenche mesmo se vazio (importante para campos como Fabricante, Especificação, etc.)
+                            valor_str = str(valor) if valor else ''
+                            await elemento.fill(valor_str)
                     elif tag_name == 'textarea':
-                        await elemento.fill(str(valor))
+                        # Preenche mesmo se vazio
+                        valor_str = str(valor) if valor else ''
+                        await elemento.fill(valor_str)
                     
                     await page.wait_for_timeout(self.delay)
                     campos_preenchidos += 1

@@ -446,8 +446,9 @@ def executar_migracoes():
     if not itens_pendentes:
         return
     
-    # Executa até 3 migrações em paralelo (para não sobrecarregar)
-    max_workers = min(3, len(itens_pendentes))
+    # Executa até 20 migrações em paralelo (aumentado para processar grandes lotes rapidamente)
+    # Limite alto para permitir processar muitos itens ao mesmo tempo
+    max_workers = min(20, len(itens_pendentes))
     
     print(f"🚀 Iniciando {len(itens_pendentes)} migração(ões) com até {max_workers} em paralelo...")
     
