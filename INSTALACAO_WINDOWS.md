@@ -35,11 +35,23 @@ Este guia resolve os problemas comuns de instalação no Windows, especialmente 
 
 ---
 
-## ❌ Erro: "Microsoft Visual C++ 14.0 or greater is required"
+## ❌ Erro: "Microsoft Visual C++ 14.0 or greater is required" (Greenlet)
 
-Este é o erro mais comum no Windows. Aqui estão as soluções:
+Este é o erro mais comum no Windows, geralmente relacionado ao `greenlet`. 
 
-### 🔧 Solução 1: Instalar Visual C++ Build Tools (Recomendado)
+**📖 Guia específico:** Veja `SOLUCAO_GREENLET.md` para soluções detalhadas sem precisar instalar Visual C++.
+
+Aqui estão as soluções rápidas:
+
+### 🔧 Solução 1: Usar Script Automático (MAIS FÁCIL)
+
+O script `instalar_windows_automatico.bat` tenta automaticamente instalar versões pré-compiladas do greenlet, evitando a necessidade de compilar.
+
+**Se ainda der erro de greenlet:**
+- Veja o guia específico: `SOLUCAO_GREENLET.md`
+- Ou continue com a Solução 2 abaixo
+
+### 🔧 Solução 2: Instalar Visual C++ Build Tools (Se necessário)
 
 1. **Acesse:**
    - https://visualstudio.microsoft.com/visual-cpp-build-tools/
@@ -56,7 +68,7 @@ Este é o erro mais comum no Windows. Aqui estão as soluções:
 4. **Execute novamente:**
    - `instalar.bat` ou `instalar_windows_automatico.bat`
 
-### 🔧 Solução 2: Usar Python Mais Recente
+### 🔧 Solução 3: Usar Python Mais Recente
 
 Versões mais recentes do Python (3.11+) geralmente têm menos problemas:
 
@@ -68,7 +80,7 @@ Versões mais recentes do Python (3.11+) geralmente têm menos problemas:
    - ✅ "Install for all users"
 4. **Execute novamente:** `instalar.bat`
 
-### 🔧 Solução 3: Instalação Manual (Avançado)
+### 🔧 Solução 4: Instalação Manual (Avançado)
 
 Abra o Prompt de Comando como **Administrador** e execute:
 

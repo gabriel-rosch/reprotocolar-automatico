@@ -54,16 +54,25 @@ echo 📥 Instalando dependências...
 echo    (Isso pode levar alguns minutos...)
 echo.
 
-REM Estratégia 1: Tenta instalar normalmente (com wheels pré-compilados)
-echo 🔍 Tentativa 1: Instalando com wheels pré-compilados...
+REM Estratégia 1: Tenta instalar greenlet primeiro (problema comum)
+echo 🔍 Tentativa 1: Instalando greenlet (dependência que precisa compilar)...
+python -m pip install --upgrade pip setuptools wheel --quiet
+python -m pip install --only-binary :all: greenlet --quiet 2>nul
+if errorlevel 1 (
+    echo    ⚠️  Tentando instalar greenlet de forma alternativa...
+    python -m pip install greenlet --no-build-isolation --quiet 2>nul
+)
+
+REM Estratégia 2: Tenta instalar normalmente (com wheels pré-compilados)
+echo 🔍 Tentativa 2: Instalando com wheels pré-compilados...
 python -m pip install --only-binary :all: -r requirements.txt --quiet 2>nul
 if not errorlevel 1 (
     echo ✅ Dependências instaladas com sucesso!
     goto :instalar_playwright
 )
 
-REM Estratégia 2: Tenta instalar sem restrições (permite compilação)
-echo 🔍 Tentativa 2: Instalando dependências (pode precisar compilar)...
+REM Estratégia 3: Tenta instalar sem restrições (permite compilação)
+echo 🔍 Tentativa 3: Instalando dependências (pode precisar compilar)...
 python -m pip install -r requirements.txt --quiet 2>nul
 if not errorlevel 1 (
     echo ✅ Dependências instaladas com sucesso!
@@ -77,12 +86,26 @@ echo.
 echo 🔧 TENTANDO SOLUÇÃO AUTOMÁTICA...
 echo.
 
-REM Estratégia 3: Instala cada dependência individualmente para identificar o problema
-echo 🔍 Tentativa 3: Instalando dependências uma por uma...
+REM Estratégia 4: Instala cada dependência individualmente para identificar o problema
+echo 🔍 Tentativa 4: Instalando dependências uma por uma...
 python -m pip install playwright==1.40.0 --quiet
 python -m pip install beautifulsoup4==4.12.2 --quiet
 python -m pip install requests==2.31.0 --quiet
 python -m pip install python-dotenv==1.0.0 --quiet
+
+REM Tenta instalar greenlet primeiro (dependência do Flask que precisa compilar)
+echo 🔍 Instalando greenlet (pode precisar compilar)...
+python -m pip install --only-binary :all: greenlet --quiet 2>nul
+if errorlevel 1 (
+    echo    ⚠️  Tentando versão pré-compilada do greenlet...
+    python -m pip install greenlet --only-binary :all: --quiet 2>nul
+    if errorlevel 1 (
+        echo    ⚠️  Tentando instalar greenlet sem restrições...
+        python -m pip install greenlet --quiet 2>nul
+    )
+)
+
+REM Agora instala Flask
 python -m pip install flask==3.0.0 --quiet
 
 REM Verifica se pelo menos as principais foram instaladas
@@ -118,9 +141,16 @@ echo       - Add Python to PATH
 echo       - Install for all users (se possível)
 echo    4. Execute este script novamente
 echo.
-echo Opção 3 - INSTALAÇÃO MANUAL (Avançado):
-echo    python -m pip install --upgrade pip
+echo Opção 3 - INSTALAÇÃO MANUAL COM GREENLET (Avançado):
+echo    python -m pip install --upgrade pip setuptools wheel
+echo    python -m pip install --only-binary :all: greenlet
 echo    python -m pip install playwright beautifulsoup4 requests python-dotenv flask
+echo.
+echo Opção 4 - INSTALAR VISUAL C++ BUILD TOOLS (Mais confiável):
+echo    1. Baixe: https://visualstudio.microsoft.com/visual-cpp-build-tools/
+echo    2. Instale "C++ build tools"
+echo    3. Reinicie o computador
+echo    4. Execute este script novamente
 echo.
 echo ==========================================
 echo.
