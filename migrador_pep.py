@@ -1172,44 +1172,50 @@ class MigradorPEP:
         print(f"🔗 URL Nova: {self.url_nova}")
         print("=" * 60)
         
+        p = None
+        browser = None
+        context = None
+        page = None
+        page_nova = None
+        
         try:
             print("🔧 Inicializando Playwright...")
             
-            # Usa context manager do Playwright
-            async with async_playwright() as p:
-                print("🌐 Iniciando navegador...")
-                
-                # Tenta lançar o navegador com configurações para evitar detecção
-                browser = await p.chromium.launch(
-                    headless=self.headless,
-                    slow_mo=50,
-                    args=[
-                        '--disable-blink-features=AutomationControlled',
-                        '--disable-dev-shm-usage',
-                        '--no-sandbox',
-                        '--disable-setuid-sandbox',
-                        '--disable-web-security',
-                        '--disable-features=IsolateOrigins,site-per-process',
-                        '--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-                    ]
-                )
-                
-                # Verifica se o navegador está aberto
-                if not browser:
-                    raise Exception("Falha ao iniciar o navegador")
-                
-                print("📄 Criando contexto do navegador...")
-                context = await browser.new_context(
-                    viewport={'width': 1920, 'height': 1080},
-                    user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                    locale='pt-BR',
-                    timezone_id='America/Sao_Paulo',
-                    # Remove flags de automação
-                    ignore_https_errors=False
-                )
-                
-                # Remove flags que identificam automação
-                await context.add_init_script("""
+            # Inicializa Playwright (sem context manager quando manter_navegador_aberto=True)
+            p = await async_playwright().start()
+            print("🌐 Iniciando navegador...")
+            
+            # Tenta lançar o navegador com configurações para evitar detecção
+            browser = await p.chromium.launch(
+                headless=self.headless,
+                slow_mo=50,
+                args=[
+                    '--disable-blink-features=AutomationControlled',
+                    '--disable-dev-shm-usage',
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-web-security',
+                    '--disable-features=IsolateOrigins,site-per-process',
+                    '--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                ]
+            )
+            
+            # Verifica se o navegador está aberto
+            if not browser:
+                raise Exception("Falha ao iniciar o navegador")
+            
+            print("📄 Criando contexto do navegador...")
+            context = await browser.new_context(
+                viewport={'width': 1920, 'height': 1080},
+                user_agent='Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                locale='pt-BR',
+                timezone_id='America/Sao_Paulo',
+                # Remove flags de automação
+                ignore_https_errors=False
+            )
+            
+            # Remove flags que identificam automação
+            await context.add_init_script("""
                     Object.defineProperty(navigator, 'webdriver', {
                         get: () => undefined
                     });
@@ -1223,108 +1229,117 @@ class MigradorPEP:
                     });
                     
                     Object.defineProperty(navigator, 'languages', {
-                        get: () => ['pt-BR', 'pt', 'en']
-                    });
-                """)
-                
-                # Verifica se o contexto foi criado
-                if not context:
-                    raise Exception("Falha ao criar contexto do navegador")
-                
-                print("📑 Criando primeira página...")
-                page = await context.new_page()
-                
-                # Verifica se a página foi criada
-                if not page:
-                    raise Exception("Falha ao criar página")
-                
-                print("✅ Navegador inicializado com sucesso!")
-                
-                # Passo 1: Fazer login
-                self.atualizar_progresso("Login", "🔄", "Fazendo login...")
-                await self.fazer_login(page)
-                self.atualizar_progresso("Login", "✅", "Login realizado com sucesso")
-                
-                # Passo 2: Extrair dados do formulário antigo
-                self.atualizar_progresso("Extração", "🔄", "Extraindo dados do formulário antigo...")
-                dados = await self.extrair_dados_formulario_antigo(page)
-                self.atualizar_progresso("Extração", "✅", f"Dados extraídos: {len(dados)} campos")
-                
-                if not dados:
-                    print("\n⚠️ Nenhum dado encontrado no formulário antigo")
-                    print("📸 Verificando página...")
-                    await page.screenshot(path='debug_formulario_antigo.png')
-                    print("  Screenshot salvo em debug_formulario_antigo.png")
-                    if not self.manter_navegador_aberto:
-                        if not self.headless:
-                            print("\n⚠️ Pressione Enter para fechar o navegador...")
-                            input()
-                        await browser.close()
-                    else:
-                        print("\n✅ Navegador mantido aberto para verificação manual")
-                    return
-                
-                # Mostra os dados extraídos
-                print("\n📋 Dados extraídos do formulário antigo:")
-                print("-" * 60)
-                for campo, valor in dados.items():
-                    # Trunca valores muito longos
-                    valor_display = str(valor)[:50] + "..." if len(str(valor)) > 50 else str(valor)
-                    print(f"  • {campo}: {valor_display}")
-                print("-" * 60)
-                
-                # Passo 3: Abrir nova aba com formulário novo
-                print("\n🆕 Abrindo nova aba para o formulário novo...")
-                self.atualizar_progresso("Preenchimento", "🔄", "Abrindo formulário novo...")
-                page_nova = await context.new_page()
-                await page_nova.goto(self.url_nova, wait_until='networkidle')
-                await page_nova.wait_for_timeout(2000)
-                
-                # Passo 4: Preencher o novo formulário
-                self.atualizar_progresso("Preenchimento", "🔄", "Preenchendo campos...")
-                await self.preencher_formulario_novo(page_nova, dados)
-                self.atualizar_progresso("Preenchimento", "✅", "Formulário preenchido com sucesso")
-                
-                # Passo 5: Processar anexos locais (se fornecido)
-                if self.caminho_pasta_anexos:
-                    print("\n" + "=" * 60)
-                    print("📎 PROCESSANDO ANEXOS")
-                    print("=" * 60)
-                    
-                    try:
-                        self.atualizar_progresso("Anexos", "🔄", "Listando arquivos...")
-                        # Lista arquivos da pasta local
-                        arquivos = self.listar_arquivos_locais(self.caminho_pasta_anexos)
-                        
-                        self.atualizar_progresso("Anexos", "🔄", f"Fazendo upload de {len(arquivos)} arquivo(s)...")
-                        # Faz upload (a função já ativa aba Anexos e preenche campo de texto)
-                        await self.fazer_upload_anexos(page_nova, arquivos)
-                        self.atualizar_progresso("Anexos", "✅", f"Upload concluído: {len(arquivos)} arquivo(s)")
-                    except Exception as e:
-                        print(f"  ⚠ Erro ao processar anexos: {str(e)}")
-                        self.atualizar_progresso("Anexos", "❌", f"Erro: {str(e)}")
-                        import traceback
-                        traceback.print_exc()
-                
-                print("\n" + "=" * 60)
-                print("✨ MIGRAÇÃO CONCLUÍDA!")
-                print("=" * 60)
-                print("\n📌 IMPORTANTE:")
-                print("  • Duas abas estão abertas:")
-                print(f"    1. Formulário ANTIGO (protocolo {self.protocolo})")
-                print("    2. Formulário NOVO (preenchido)")
-                print("  • Revise ambos os formulários antes de submeter")
-                print("  • NENHUM formulário será submetido automaticamente")
-                
-                # Mantém o navegador aberto para revisão (se não for modo GUI)
+                    get: () => ['pt-BR', 'pt', 'en']
+                });
+            """)
+            
+            # Verifica se o contexto foi criado
+            if not context:
+                raise Exception("Falha ao criar contexto do navegador")
+            
+            print("📑 Criando primeira página...")
+            page = await context.new_page()
+            
+            # Verifica se a página foi criada
+            if not page:
+                raise Exception("Falha ao criar página")
+            
+            print("✅ Navegador inicializado com sucesso!")
+            
+            # Passo 1: Fazer login
+            self.atualizar_progresso("Login", "🔄", "Fazendo login...")
+            await self.fazer_login(page)
+            self.atualizar_progresso("Login", "✅", "Login realizado com sucesso")
+            
+            # Passo 2: Extrair dados do formulário antigo
+            self.atualizar_progresso("Extração", "🔄", "Extraindo dados do formulário antigo...")
+            dados = await self.extrair_dados_formulario_antigo(page)
+            self.atualizar_progresso("Extração", "✅", f"Dados extraídos: {len(dados)} campos")
+            
+            if not dados:
+                print("\n⚠️ Nenhum dado encontrado no formulário antigo")
+                print("📸 Verificando página...")
+                await page.screenshot(path='debug_formulario_antigo.png')
+                print("  Screenshot salvo em debug_formulario_antigo.png")
                 if not self.manter_navegador_aberto:
                     if not self.headless:
                         print("\n⚠️ Pressione Enter para fechar o navegador...")
                         input()
-                    # Fecha o navegador após o usuário pressionar Enter
                     await browser.close()
+                    if p:
+                        await p.stop()
                 else:
-                    print("\n✅ Navegador mantido aberto para revisão (modo GUI)")
+                    print("\n✅ Navegador mantido aberto para verificação manual")
+                return
+            
+            # Mostra os dados extraídos
+            print("\n📋 Dados extraídos do formulário antigo:")
+            print("-" * 60)
+            for campo, valor in dados.items():
+                # Trunca valores muito longos
+                valor_display = str(valor)[:50] + "..." if len(str(valor)) > 50 else str(valor)
+                print(f"  • {campo}: {valor_display}")
+            print("-" * 60)
+            
+            # Passo 3: Abrir nova aba com formulário novo
+            print("\n🆕 Abrindo nova aba para o formulário novo...")
+            self.atualizar_progresso("Preenchimento", "🔄", "Abrindo formulário novo...")
+            page_nova = await context.new_page()
+            await page_nova.goto(self.url_nova, wait_until='networkidle')
+            await page_nova.wait_for_timeout(2000)
+            
+            # Passo 4: Preencher o novo formulário
+            self.atualizar_progresso("Preenchimento", "🔄", "Preenchendo campos...")
+            await self.preencher_formulario_novo(page_nova, dados)
+            self.atualizar_progresso("Preenchimento", "✅", "Formulário preenchido com sucesso")
+            
+            # Passo 5: Processar anexos locais (se fornecido)
+            if self.caminho_pasta_anexos:
+                print("\n" + "=" * 60)
+                print("📎 PROCESSANDO ANEXOS")
+                print("=" * 60)
+                
+                try:
+                    self.atualizar_progresso("Anexos", "🔄", "Listando arquivos...")
+                    # Lista arquivos da pasta local
+                    arquivos = self.listar_arquivos_locais(self.caminho_pasta_anexos)
+                    
+                    self.atualizar_progresso("Anexos", "🔄", f"Fazendo upload de {len(arquivos)} arquivo(s)...")
+                    # Faz upload (a função já ativa aba Anexos e preenche campo de texto)
+                    await self.fazer_upload_anexos(page_nova, arquivos)
+                    self.atualizar_progresso("Anexos", "✅", f"Upload concluído: {len(arquivos)} arquivo(s)")
+                except Exception as e:
+                    print(f"  ⚠ Erro ao processar anexos: {str(e)}")
+                    self.atualizar_progresso("Anexos", "❌", f"Erro: {str(e)}")
+                    import traceback
+                    traceback.print_exc()
+            
+            print("\n" + "=" * 60)
+            print("✨ MIGRAÇÃO CONCLUÍDA!")
+            print("=" * 60)
+            print("\n📌 IMPORTANTE:")
+            print("  • Duas abas estão abertas:")
+            print(f"    1. Formulário ANTIGO (protocolo {self.protocolo})")
+            print("    2. Formulário NOVO (preenchido)")
+            print("  • Revise ambos os formulários antes de submeter")
+            print("  • NENHUM formulário será submetido automaticamente")
+            
+            # Mantém o navegador aberto para revisão (se não for modo GUI)
+            if not self.manter_navegador_aberto:
+                if not self.headless:
+                    print("\n⚠️ Pressione Enter para fechar o navegador...")
+                    input()
+                # Fecha o navegador após o usuário pressionar Enter
+                await browser.close()
+                # Fecha o Playwright
+                if p:
+                    await p.stop()
+            else:
+                print("\n✅ Navegador mantido aberto para revisão (modo GUI)")
+                print("   ⚠️  IMPORTANTE: As abas permanecerão abertas para você revisar e salvar manualmente.")
+                print("   💡 Feche o navegador manualmente quando terminar a verificação.")
+                print("   💡 O Playwright permanecerá ativo para manter o navegador aberto.")
+                # NÃO fecha o navegador nem o Playwright quando manter_navegador_aberto=True
                 
         except Exception as e:
             print(f"\n❌ Erro durante a migração: {str(e)}")
@@ -1337,14 +1352,27 @@ class MigradorPEP:
             except:
                 pass
             # Fecha o navegador em caso de erro (apenas se não for para manter aberto)
-            if 'browser' in locals() and browser:
+            if browser:
                 if not self.manter_navegador_aberto:
                     try:
                         await browser.close()
                     except:
                         pass
+                    # Fecha o Playwright também
+                    if p:
+                        try:
+                            await p.stop()
+                        except:
+                            pass
                 else:
                     print("\n⚠️ Erro ocorreu, mas navegador mantido aberto para verificação manual")
+                    print("   💡 O Playwright permanecerá ativo para manter o navegador aberto.")
+            elif p and not self.manter_navegador_aberto:
+                # Se não conseguiu criar browser mas criou Playwright, fecha
+                try:
+                    await p.stop()
+                except:
+                    pass
             # Não faz raise para evitar erro duplo
             return
 
