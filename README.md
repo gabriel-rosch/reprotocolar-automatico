@@ -2,6 +2,34 @@
 
 Projeto para migração automática de dados entre formulários web do sistema PEP CELESC.
 
+## 📥 Como Baixar o Projeto
+
+### Para Pessoas Não Técnicas:
+
+1. **Acesse:** https://github.com/gabriel-rosch/reprotocolar-automatico
+2. **Clique no botão verde "Code"** → **"Download ZIP"**
+3. **Extraia o arquivo ZIP** na pasta desejada
+4. **Leia o arquivo `LEIA-ME.txt`** para instruções rápidas
+5. **Execute `instalar.sh`** (macOS/Linux) ou `instalar.bat` (Windows)
+
+📖 **Guia completo:** Veja `COMO_BAIXAR.md` para instruções detalhadas.
+
+## 🌐 Executar na Rede Local
+
+Para permitir que outras pessoas na mesma rede acessem o sistema:
+
+**macOS/Linux:**
+```bash
+./executar_web_rede.sh
+```
+
+**Windows:**
+```bash
+executar_web_rede.bat
+```
+
+📖 **Guia completo:** Veja `ACESSO_REDE.md` para instruções detalhadas sobre acesso na rede.
+
 ## 🚀 Tecnologias
 
 - **Python 3.8+**
@@ -106,7 +134,15 @@ MAPEAMENTO_CAMPOS = {
 python3 -m playwright install --with-deps chromium
 ```
 
+**No Windows, se tiver erro de Visual C++ Build Tools:**
+- Execute: `instalar_windows_automatico.bat` (resolve automaticamente)
+- Ou veja: `INSTALACAO_WINDOWS.md` para soluções detalhadas
+
 **No macOS/Fish shell, use sempre `python3` ao invés de `python`:**
+
+**No Windows, se tiver erro de Visual C++ Build Tools:**
+- Execute: `instalar_windows_automatico.bat` (resolve automaticamente)
+- Ou veja: `INSTALACAO_WINDOWS.md` para soluções detalhadas
 ```bash
 # Instalar dependências
 python3 -m pip install -r requirements.txt

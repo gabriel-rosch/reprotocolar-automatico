@@ -72,6 +72,10 @@
    ❌ "Porta 5000 em uso"
       → Feche outros programas ou reinicie o computador
 
+   ❌ "Microsoft Visual C++ 14.0 required" (Windows)
+      → Veja: INSTALACAO_WINDOWS.md
+      → Ou execute: instalar_windows_automatico.bat
+
    ❌ "Pasta não encontrada"
       → Verifique se o caminho está correto
       → Use caminhos absolutos (completo desde / ou C:\)

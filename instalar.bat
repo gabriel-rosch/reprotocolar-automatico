@@ -35,18 +35,76 @@ if errorlevel 1 (
 echo ✅ pip encontrado
 echo.
 
-REM Instala dependências
-echo 📥 Instalando dependências...
+REM Atualiza pip primeiro
+echo 🔄 Atualizando pip...
 python -m pip install --upgrade pip --quiet
-python -m pip install -r requirements.txt --quiet
+echo.
 
-if errorlevel 1 (
-    echo ❌ Erro ao instalar dependências
-    echo 💡 Tente executar manualmente:
-    echo    python -m pip install -r requirements.txt
-    pause
-    exit /b 1
+REM Instala dependências com múltiplas estratégias
+echo 📥 Instalando dependências...
+echo    (Isso pode levar alguns minutos...)
+echo.
+
+REM Tenta primeiro com wheels pré-compilados (mais rápido)
+python -m pip install --only-binary :all: -r requirements.txt --quiet 2>nul
+if not errorlevel 1 (
+    echo ✅ Dependências instaladas com sucesso!
+    goto :deps_ok
 )
+
+REM Se falhou, tenta instalação normal
+python -m pip install -r requirements.txt --quiet
+if not errorlevel 1 (
+    echo ✅ Dependências instaladas com sucesso!
+    goto :deps_ok
+)
+
+REM Se ainda falhou, tenta instalar uma por uma
+echo ⚠️  Tentando instalar dependências individualmente...
+python -m pip install playwright==1.40.0 --quiet
+python -m pip install beautifulsoup4==4.12.2 --quiet
+python -m pip install requests==2.31.0 --quiet
+python -m pip install python-dotenv==1.0.0 --quiet
+python -m pip install flask==3.0.0 --quiet
+
+REM Verifica se pelo menos as principais funcionam
+python -c "import playwright; import flask; print('OK')" >nul 2>&1
+if not errorlevel 1 (
+    echo ✅ Dependências principais instaladas!
+    goto :deps_ok
+)
+
+REM Se chegou aqui, houve erro crítico
+echo.
+echo ==========================================
+echo ❌ ERRO: Falha na instalação de dependências
+echo ==========================================
+echo.
+echo 💡 PROBLEMA COMUM NO WINDOWS:
+echo    Algumas dependências precisam ser COMPILADAS
+echo    e isso requer o Microsoft Visual C++ Build Tools.
+echo.
+echo 🔧 SOLUÇÕES:
+echo.
+echo Opção 1 - INSTALAR VISUAL C++ BUILD TOOLS:
+echo    1. Abra: https://visualstudio.microsoft.com/visual-cpp-build-tools/
+echo    2. Baixe e instale "Microsoft C++ Build Tools"
+echo    3. Execute este script novamente
+echo.
+echo Opção 2 - USAR SCRIPT AUTOMÁTICO:
+echo    Execute: instalar_windows_automatico.bat
+echo    (Ele tenta resolver automaticamente)
+echo.
+echo Opção 3 - INSTALAÇÃO MANUAL:
+echo    python -m pip install --upgrade pip
+echo    python -m pip install playwright beautifulsoup4 requests python-dotenv flask
+echo.
+echo ==========================================
+echo.
+pause
+exit /b 1
+
+:deps_ok
 
 echo ✅ Dependências instaladas
 echo.

@@ -436,8 +436,100 @@ def executar_migracoes():
         # Aguarda um pouco antes do próximo
         threading.Event().wait(2)
 
+def obter_ip_local():
+    """Obtém o IP local da máquina"""
+    import socket
+    try:
+        # Conecta a um servidor externo para descobrir o IP local
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "localhost"
+
+def encontrar_porta_disponivel(porta_inicial=5000, max_tentativas=10):
+    """Encontra uma porta disponível começando da porta inicial"""
+    import socket
+    for i in range(max_tentativas):
+        porta = porta_inicial + i
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.bind(('', porta))
+                return porta
+        except OSError:
+            continue
+    return None
+
+def obter_porta_dos_argumentos():
+    """Extrai a porta dos argumentos da linha de comando"""
+    import sys
+    for i, arg in enumerate(sys.argv):
+        if arg in ['--port', '-p'] and i + 1 < len(sys.argv):
+            try:
+                return int(sys.argv[i + 1])
+            except ValueError:
+                return None
+        elif arg.startswith('--port='):
+            try:
+                return int(arg.split('=')[1])
+            except ValueError:
+                return None
+    return None
+
 if __name__ == '__main__':
-    print("🌐 Iniciando interface web...")
-    print("📱 Acesse: http://localhost:5000")
-    app.run(debug=True, port=5000)
+    import sys
+    
+    # Verifica se deve rodar na rede local
+    rodar_rede = '--rede' in sys.argv or '--network' in sys.argv
+    
+    # Tenta obter porta dos argumentos
+    porta_customizada = obter_porta_dos_argumentos()
+    porta_inicial = porta_customizada if porta_customizada else 5000
+    
+    # Encontra porta disponível
+    porta = encontrar_porta_disponivel(porta_inicial)
+    if not porta:
+        print("❌ Erro: Não foi possível encontrar uma porta disponível!")
+        print("💡 Tente fechar outros programas ou especificar uma porta:")
+        print("   python3 gui_migrador_web.py --port 5001")
+        sys.exit(1)
+    
+    if porta != porta_inicial:
+        print(f"⚠️  Porta {porta_inicial} está em uso. Usando porta {porta}.")
+        if porta_inicial == 5000:
+            print("💡 No macOS, isso geralmente acontece por causa do AirPlay Receiver.")
+            print("   Para desabilitar: Preferências do Sistema → Compartilhamento → AirPlay Receiver")
+    
+    if rodar_rede:
+        ip_local = obter_ip_local()
+        print("🌐 Iniciando interface web na rede local...")
+        print(f"📱 Acesse localmente: http://localhost:{porta}")
+        print(f"🌍 Acesse pela rede: http://{ip_local}:{porta}")
+        print(f"\n💡 Outras pessoas na mesma rede podem acessar:")
+        print(f"   http://{ip_local}:{porta}")
+        print(f"\n⚠️  Certifique-se de que o firewall permite conexões na porta {porta}")
+        try:
+            app.run(debug=True, host='0.0.0.0', port=porta)
+        except OSError as e:
+            if "Address already in use" in str(e):
+                print(f"\n❌ Erro: Porta {porta} ainda está em uso!")
+                print("💡 Tente especificar outra porta:")
+                print(f"   python3 gui_migrador_web.py --rede --port {porta + 1}")
+            else:
+                raise
+    else:
+        print("🌐 Iniciando interface web (apenas local)...")
+        print(f"📱 Acesse: http://localhost:{porta}")
+        print("💡 Para permitir acesso na rede, execute com: --rede")
+        try:
+            app.run(debug=True, port=porta)
+        except OSError as e:
+            if "Address already in use" in str(e):
+                print(f"\n❌ Erro: Porta {porta} ainda está em uso!")
+                print("💡 Tente especificar outra porta:")
+                print(f"   python3 gui_migrador_web.py --port {porta + 1}")
+            else:
+                raise
 
