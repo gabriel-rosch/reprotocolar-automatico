@@ -8,6 +8,7 @@ import os
 import json
 from datetime import datetime
 import asyncio
+import concurrent.futures
 from migrador_pep import MigradorPEP
 
 app = Flask(__name__)
@@ -388,53 +389,84 @@ def status():
         'itens': list(itens_migracao.values())
     })
 
-def executar_migracoes():
-    """Executa as migrações"""
-    for protocolo, item in itens_migracao.items():
-        if item['status'] != 'Pendente':
-            continue
+def executar_migracao_item(protocolo, item):
+    """Executa uma migração individual"""
+    if item['status'] != 'Pendente':
+        return
+    
+    item['status'] = 'Executando'
+    
+    def callback_progresso(step, status, mensagem=""):
+        if step in item['steps']:
+            item['steps'][step] = status
+        item['mensagem'] = mensagem
+        if step == "Login":
+            item['progresso'] = 20
+        elif step == "Extração":
+            item['progresso'] = 40
+        elif step == "Preenchimento":
+            item['progresso'] = 70
+        elif step == "Anexos":
+            item['progresso'] = 90
+    
+    try:
+        migrador = MigradorPEP(
+            item['protocolo'],
+            item['caminho_pasta'],
+            callback_progresso=callback_progresso,
+            manter_navegador_aberto=True  # Mantém navegador aberto para verificação manual
+        )
         
-        item['status'] = 'Executando'
-        
-        def callback_progresso(step, status, mensagem=""):
-            if step in item['steps']:
-                item['steps'][step] = status
-            item['mensagem'] = mensagem
-            if step == "Login":
-                item['progresso'] = 20
-            elif step == "Extração":
-                item['progresso'] = 40
-            elif step == "Preenchimento":
-                item['progresso'] = 70
-            elif step == "Anexos":
-                item['progresso'] = 90
-        
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         try:
-            migrador = MigradorPEP(
-                item['protocolo'],
-                item['caminho_pasta'],
-                callback_progresso=callback_progresso,
-                manter_navegador_aberto=True  # Mantém navegador aberto para verificação manual
-            )
-            
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                loop.run_until_complete(migrador.executar_migracao())
-                item['status'] = 'Concluído'
-                item['progresso'] = 100
-                item['mensagem'] = 'Migração concluída com sucesso!'
-            except Exception as e:
-                item['status'] = 'Erro'
-                item['mensagem'] = f'Erro: {str(e)}'
-            finally:
-                loop.close()
+            loop.run_until_complete(migrador.executar_migracao())
+            item['status'] = 'Concluído'
+            item['progresso'] = 100
+            item['mensagem'] = 'Migração concluída! Navegador aberto para verificação manual.'
         except Exception as e:
             item['status'] = 'Erro'
-            item['mensagem'] = f'Erro crítico: {str(e)}'
+            item['mensagem'] = f'Erro: {str(e)}'
+        finally:
+            loop.close()
+    except Exception as e:
+        item['status'] = 'Erro'
+        item['mensagem'] = f'Erro crítico: {str(e)}'
+
+def executar_migracoes():
+    """Executa as migrações em paralelo"""
+    
+    # Filtra apenas itens pendentes
+    itens_pendentes = [
+        (protocolo, item) 
+        for protocolo, item in itens_migracao.items() 
+        if item['status'] == 'Pendente'
+    ]
+    
+    if not itens_pendentes:
+        return
+    
+    # Executa até 3 migrações em paralelo (para não sobrecarregar)
+    max_workers = min(3, len(itens_pendentes))
+    
+    print(f"🚀 Iniciando {len(itens_pendentes)} migração(ões) com até {max_workers} em paralelo...")
+    
+    # Usa ThreadPoolExecutor para executar em paralelo
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # Submete todas as migrações
+        futures = {
+            executor.submit(executar_migracao_item, protocolo, item): (protocolo, item)
+            for protocolo, item in itens_pendentes
+        }
         
-        # Aguarda um pouco antes do próximo
-        threading.Event().wait(2)
+        # Aguarda todas completarem
+        for future in concurrent.futures.as_completed(futures):
+            protocolo, item = futures[future]
+            try:
+                future.result()  # Verifica se houve exceção
+            except Exception as e:
+                item['status'] = 'Erro'
+                item['mensagem'] = f'Erro na execução: {str(e)}'
 
 def obter_ip_local():
     """Obtém o IP local da máquina"""

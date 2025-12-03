@@ -108,10 +108,16 @@ echo.
 echo    💡 SOLUÇÃO PARA PYTHON %PYTHON_VERSION%:
 echo.
 echo    Opção A - USAR PYTHON 3.11 ou 3.12 (RECOMENDADO):
+echo       Python %PYTHON_VERSION% é muito recente e não tem wheels para greenlet.
+echo       Use Python 3.11 ou 3.12 para evitar problemas de compilação.
+echo.
 echo       1. Desinstale Python %PYTHON_VERSION%
 echo       2. Baixe Python 3.11 ou 3.12 de: https://www.python.org/downloads/
-echo       3. Durante instalação, marque "Add Python to PATH"
+echo          (Procure por "Python 3.11" ou "Python 3.12" na página)
+echo       3. Durante instalação, MARQUE "Add Python to PATH"
 echo       4. Execute este script novamente
+echo.
+echo       💡 Veja também: VERSAO_PYTHON.txt para mais detalhes
 echo.
 echo    Opção B - INSTALAR VISUAL C++ BUILD TOOLS:
 echo       1. Baixe: https://visualstudio.microsoft.com/visual-cpp-build-tools/

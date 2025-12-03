@@ -1255,10 +1255,13 @@ class MigradorPEP:
                     print("📸 Verificando página...")
                     await page.screenshot(path='debug_formulario_antigo.png')
                     print("  Screenshot salvo em debug_formulario_antigo.png")
-                    if not self.headless:
-                        print("\n⚠️ Pressione Enter para fechar o navegador...")
-                        input()
-                    await browser.close()
+                    if not self.manter_navegador_aberto:
+                        if not self.headless:
+                            print("\n⚠️ Pressione Enter para fechar o navegador...")
+                            input()
+                        await browser.close()
+                    else:
+                        print("\n✅ Navegador mantido aberto para verificação manual")
                     return
                 
                 # Mostra os dados extraídos
@@ -1333,12 +1336,15 @@ class MigradorPEP:
                     print("📸 Screenshot do erro salvo em debug_erro.png")
             except:
                 pass
-            # Fecha o navegador em caso de erro
+            # Fecha o navegador em caso de erro (apenas se não for para manter aberto)
             if 'browser' in locals() and browser:
-                try:
-                    await browser.close()
-                except:
-                    pass
+                if not self.manter_navegador_aberto:
+                    try:
+                        await browser.close()
+                    except:
+                        pass
+                else:
+                    print("\n⚠️ Erro ocorreu, mas navegador mantido aberto para verificação manual")
             # Não faz raise para evitar erro duplo
             return
 

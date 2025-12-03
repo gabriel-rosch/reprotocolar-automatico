@@ -1,0 +1,67 @@
+═══════════════════════════════════════════════════════════════
+    VERSÃO CORRETA DO PYTHON PARA INSTALAR
+═══════════════════════════════════════════════════════════════
+
+🎯 RECOMENDAÇÃO PRINCIPAL:
+
+   Python 3.11 ou Python 3.12
+
+   ✅ Melhor suporte para wheels pré-compilados
+   ✅ Evita problemas de compilação (greenlet, etc)
+   ✅ Versões estáveis e bem suportadas
+   ✅ Compatível com todas as dependências do projeto
+
+
+📥 ONDE BAIXAR:
+
+   https://www.python.org/downloads/
+
+   Procure por:
+   - Python 3.11.x (qualquer versão 3.11)
+   - Python 3.12.x (qualquer versão 3.12)
+
+
+⚠️  VERSÕES A EVITAR:
+
+   ❌ Python 3.14 ou superior
+      → Muito nova, pode não ter wheels para todas as dependências
+      → Pode precisar compilar (requer Visual C++ Build Tools)
+
+   ❌ Python 3.8 ou inferior
+      → Muito antiga, pode não ter suporte para algumas dependências
+
+
+✅ VERSÕES COMPATÍVEIS (em ordem de recomendação):
+
+   1. Python 3.12.x ⭐ (MAIS RECOMENDADO)
+      → Melhor suporte atual
+      → Mais wheels pré-compilados disponíveis
+
+   2. Python 3.11.x ⭐ (RECOMENDADO)
+      → Muito estável
+      → Excelente suporte para wheels
+
+   3. Python 3.10.x
+      → Funciona, mas 3.11/3.12 são melhores
+
+   4. Python 3.9.x
+      → Funciona (é a versão que o desenvolvedor usa)
+      → Mas 3.11/3.12 têm melhor suporte
+
+
+🔧 DURANTE A INSTALAÇÃO DO PYTHON:
+
+   ✅ MARQUE: "Add Python to PATH"
+   ✅ MARQUE: "Install for all users" (se possível)
+   ✅ Clique em: "Install Now"
+
+
+📋 RESUMO:
+
+   Para evitar problemas:
+   → Use Python 3.11 ou 3.12
+   → Marque "Add Python to PATH"
+   → Execute: instalar_windows_automatico.bat
+
+═══════════════════════════════════════════════════════════════
+
