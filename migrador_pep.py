@@ -19,7 +19,8 @@ class MigradorPEP:
         self.delay = config.DELAY_PREENCHIMENTO
         self.headless = config.HEADLESS
         self.callback_progresso = callback_progresso
-        self.manter_navegador_aberto = manter_navegador_aberto
+        # SEMPRE manter navegador aberto quando usado pela GUI web
+        self.manter_navegador_aberto = True
         
         # URLs completas
         self.url_antiga = f"{self.url_base}?idSO={protocolo}"
@@ -219,14 +220,19 @@ class MigradorPEP:
             if name and ('j_idt' in name or 'javax.faces.ViewState' in name or name == 'form'):
                 continue
             
-            value = await input_elem.input_value()
+            try:
+                value = await input_elem.input_value()
+            except:
+                # Tenta pegar o valor via atributo value
+                value = await input_elem.get_attribute('value') or ''
             
-            # Ignora campos vazios
-            if value:
+            # Captura campos mesmo se vazios (alguns campos podem ser importantes mesmo vazios)
+            # Mas prioriza campos com valor
+            if value or (name and ('descricao' in name.lower() or 'cabo' in name.lower() or 'gerais' in name.lower() or 'dados' in name.lower())):
                 if name:
-                    dados[name] = value
+                    dados[name] = value or ''
                 elif id_attr:
-                    dados[id_attr] = value
+                    dados[id_attr] = value or ''
         
         # Textareas (ignora campos de sistema)
         textareas = await page.query_selector_all('textarea')
@@ -238,12 +244,17 @@ class MigradorPEP:
             if name and 'j_idt' in name:
                 continue
             
-            value = await textarea.input_value()
-            if value:
+            try:
+                value = await textarea.input_value()
+            except:
+                value = ''
+            
+            # Captura textareas mesmo se vazios (especialmente descrição do cabo e dados gerais)
+            if value or (name and ('descricao' in name.lower() or 'cabo' in name.lower() or 'gerais' in name.lower() or 'dados' in name.lower())):
                 if name:
-                    dados[name] = value
+                    dados[name] = value or ''
                 elif id_attr:
-                    dados[id_attr] = value
+                    dados[id_attr] = value or ''
         
         # Selects (dropdowns)
         selects = await page.query_selector_all('select')
@@ -593,7 +604,8 @@ class MigradorPEP:
                         logradouros_nao_encontrados.append(nome_logradouro)
                         
             except Exception as e:
-                print(f"    ❌ Erro ao processar logradouro: {str(e)}")
+                # Não dispara erro, apenas registra que não foi encontrado
+                print(f"    ⚠️ Logradouro '{nome_logradouro}' não encontrado (será deixado sem preencher)")
                 logradouros_nao_encontrados.append(nome_logradouro)
         
         # Adiciona mensagem no comentário se houver logradouros não encontrados
@@ -1256,21 +1268,13 @@ class MigradorPEP:
             dados = await self.extrair_dados_formulario_antigo(page)
             self.atualizar_progresso("Extração", "✅", f"Dados extraídos: {len(dados)} campos")
             
-            if not dados:
-                print("\n⚠️ Nenhum dado encontrado no formulário antigo")
-                print("📸 Verificando página...")
-                await page.screenshot(path='debug_formulario_antigo.png')
-                print("  Screenshot salvo em debug_formulario_antigo.png")
-                if not self.manter_navegador_aberto:
-                    if not self.headless:
-                        print("\n⚠️ Pressione Enter para fechar o navegador...")
-                        input()
-                    await browser.close()
-                    if p:
-                        await p.stop()
-                else:
+                if not dados:
+                    print("\n⚠️ Nenhum dado encontrado no formulário antigo")
+                    print("📸 Verificando página...")
+                    await page.screenshot(path='debug_formulario_antigo.png')
+                    print("  Screenshot salvo em debug_formulario_antigo.png")
                     print("\n✅ Navegador mantido aberto para verificação manual")
-                return
+                    return
             
             # Mostra os dados extraídos
             print("\n📋 Dados extraídos do formulário antigo:")
@@ -1324,22 +1328,12 @@ class MigradorPEP:
             print("  • Revise ambos os formulários antes de submeter")
             print("  • NENHUM formulário será submetido automaticamente")
             
-            # Mantém o navegador aberto para revisão (se não for modo GUI)
-            if not self.manter_navegador_aberto:
-                if not self.headless:
-                    print("\n⚠️ Pressione Enter para fechar o navegador...")
-                    input()
-                # Fecha o navegador após o usuário pressionar Enter
-                await browser.close()
-                # Fecha o Playwright
-                if p:
-                    await p.stop()
-            else:
-                print("\n✅ Navegador mantido aberto para revisão (modo GUI)")
-                print("   ⚠️  IMPORTANTE: As abas permanecerão abertas para você revisar e salvar manualmente.")
-                print("   💡 Feche o navegador manualmente quando terminar a verificação.")
-                print("   💡 O Playwright permanecerá ativo para manter o navegador aberto.")
-                # NÃO fecha o navegador nem o Playwright quando manter_navegador_aberto=True
+            # SEMPRE mantém o navegador aberto para revisão manual
+            print("\n✅ Navegador mantido aberto para revisão")
+            print("   ⚠️  IMPORTANTE: As abas permanecerão abertas para você revisar e salvar manualmente.")
+            print("   💡 Feche o navegador manualmente quando terminar a verificação.")
+            print("   💡 O Playwright permanecerá ativo para manter o navegador aberto.")
+            # NÃO fecha o navegador nem o Playwright - sempre mantém aberto
                 
         except Exception as e:
             print(f"\n❌ Erro durante a migração: {str(e)}")
@@ -1351,28 +1345,10 @@ class MigradorPEP:
                     print("📸 Screenshot do erro salvo em debug_erro.png")
             except:
                 pass
-            # Fecha o navegador em caso de erro (apenas se não for para manter aberto)
+            # SEMPRE mantém o navegador aberto mesmo em caso de erro
             if browser:
-                if not self.manter_navegador_aberto:
-                    try:
-                        await browser.close()
-                    except:
-                        pass
-                    # Fecha o Playwright também
-                    if p:
-                        try:
-                            await p.stop()
-                        except:
-                            pass
-                else:
-                    print("\n⚠️ Erro ocorreu, mas navegador mantido aberto para verificação manual")
-                    print("   💡 O Playwright permanecerá ativo para manter o navegador aberto.")
-            elif p and not self.manter_navegador_aberto:
-                # Se não conseguiu criar browser mas criou Playwright, fecha
-                try:
-                    await p.stop()
-                except:
-                    pass
+                print("\n⚠️ Erro ocorreu, mas navegador mantido aberto para verificação manual")
+                print("   💡 O Playwright permanecerá ativo para manter o navegador aberto.")
             # Não faz raise para evitar erro duplo
             return
 
