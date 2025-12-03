@@ -1268,13 +1268,13 @@ class MigradorPEP:
             dados = await self.extrair_dados_formulario_antigo(page)
             self.atualizar_progresso("Extração", "✅", f"Dados extraídos: {len(dados)} campos")
             
-                if not dados:
-                    print("\n⚠️ Nenhum dado encontrado no formulário antigo")
-                    print("📸 Verificando página...")
-                    await page.screenshot(path='debug_formulario_antigo.png')
-                    print("  Screenshot salvo em debug_formulario_antigo.png")
-                    print("\n✅ Navegador mantido aberto para verificação manual")
-                    return
+            if not dados:
+                print("\n⚠️ Nenhum dado encontrado no formulário antigo")
+                print("📸 Verificando página...")
+                await page.screenshot(path='debug_formulario_antigo.png')
+                print("  Screenshot salvo em debug_formulario_antigo.png")
+                print("\n✅ Navegador mantido aberto para verificação manual")
+                return
             
             # Mostra os dados extraídos
             print("\n📋 Dados extraídos do formulário antigo:")
