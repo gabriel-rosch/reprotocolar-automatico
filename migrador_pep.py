@@ -568,11 +568,16 @@ class MigradorPEP:
                     # Passo 5: Clica no botão "Incluir Logradouro"
                     print(f"    ➕ Clicando em 'Incluir Logradouro'...")
                     try:
-                        botao_incluir = await page.query_selector('button[name="form:tabs:j_idt227"]')
+                        # Tenta encontrar o botão de incluir logradouro (o nome pode mudar)
+                        botao_incluir = await page.query_selector('button[id*="incluirLogradouro"], button[name*="j_idt227"]')
+                        if not botao_incluir:
+                            # Tenta por texto
+                            botao_incluir = await page.query_selector('button:has-text("Incluir")')
+                            
                         if botao_incluir:
                             await botao_incluir.click()
                             await page.wait_for_timeout(2000)  # Aguarda adicionar na tabela e limpar formulário
-                            print(f"    ✓ Logradouro adicionado ao itinerário (formulário limpo automaticamente)")
+                            print(f"    ✓ Logradouro adicionado ao itinerário")
                             logradouros_encontrados.append(nome_logradouro)
                         else:
                             print(f"    ⚠ Botão 'Incluir Logradouro' não encontrado")
@@ -581,13 +586,13 @@ class MigradorPEP:
                         print(f"    ⚠ Erro ao clicar no botão Incluir: {str(e)}")
                         logradouros_nao_encontrados.append(nome_logradouro)
                 else:
-                    # Não encontrou - apenas registra, não faz busca aprofundada
-                    print(f"    ⚠️ Logradouro '{nome_logradouro}' não encontrado (será deixado sem preencher)")
+                    # Não encontrou de primeira - DESISTE (conforme solicitado pelo usuário)
+                    print(f"    ⚠️ Logradouro '{nome_logradouro}' não encontrado no bairro informado. Deixando em branco.")
                     logradouros_nao_encontrados.append(nome_logradouro)
                         
             except Exception as e:
                 # Não dispara erro, apenas registra que não foi encontrado
-                print(f"    ⚠️ Logradouro '{nome_logradouro}' não encontrado (será deixado sem preencher)")
+                print(f"    ⚠️ Erro ao processar logradouro '{nome_logradouro}': {str(e)}. Deixando em branco.")
                 logradouros_nao_encontrados.append(nome_logradouro)
         
         # Adiciona mensagem no comentário se houver logradouros não encontrados
@@ -814,69 +819,69 @@ class MigradorPEP:
             # Procura pelo input de upload do PrimeFaces
             print("  🔍 Procurando campo de upload...")
             
-            # O PrimeFaces FileUpload geralmente tem um input file
-            # Pode estar escondido ou dentro de um span com classe ui-fileupload-choose
-            input_file = None
+            # Tenta encontrar o botão "Selecionar Arquivos" para garantir que a aba reagiu
+            botao_selecionar = await page.query_selector('span.ui-fileupload-choose, button:has-text("Selecionar"), .ui-fileupload-buttonbar .ui-button')
+            if botao_selecionar:
+                print("    👆 Botão 'Selecionar Arquivos' encontrado, preparando upload...")
+                # No Playwright, não clicamos no botão para upload, usamos o set_input_files no input escondido
             
-            # Tenta diferentes seletores
-            seletores = [
-                'input[type="file"][name*="j_idt358"]',
-                'input[type="file"]',
-                'input[type="file"][id*="j_idt358"]'
-            ]
+            # O PrimeFaces FileUpload tem um input file escondido que termina com '_input'
+            print("  🔍 Localizando seletor de arquivos PrimeFaces...")
             
-            for selector in seletores:
-                input_file = await page.query_selector(selector)
-                if input_file:
-                    # Verifica se está visível ou se precisa clicar no botão primeiro
-                    is_visible = await input_file.is_visible()
-                    if not is_visible:
-                        # Tenta clicar no botão "Selecionar Arquivos"
-                        botao_selecionar = await page.query_selector('span.ui-fileupload-choose, button:has-text("Selecionar"), span:has-text("Selecionar Arquivos")')
-                        if botao_selecionar:
-                            await botao_selecionar.click()
-                            await page.wait_for_timeout(500)
-                    break
+            # Tenta encontrar o input específico pelo ID que você forneceu ou similares
+            input_file = await page.query_selector('input[type="file"][id$="_input"]')
             
+            if not input_file:
+                # Fallback: busca qualquer input de arquivo se o específico falhar
+                input_file = await page.query_selector('input[type="file"]')
+
             if input_file:
-                print("  ✓ Campo de upload encontrado")
+                print(f"  ✓ Campo de upload localizado (ID: {await input_file.get_attribute('id')})")
                 
-                if not arquivos:
-                    print("  ⚠ Nenhum arquivo para fazer upload")
-                    print("  💡 Você pode fazer o upload manualmente clicando em 'Selecionar Arquivos'")
-                    return
-                
-                # Filtra apenas arquivos que existem
-                arquivos_validos = [arq for arq in arquivos if os.path.exists(arq)]
+                # Filtra apenas arquivos que existem e ignora arquivos temporários/ocultos
+                arquivos_validos = [arq for arq in arquivos if os.path.exists(arq) and not os.path.basename(arq).startswith('.')]
                 
                 if not arquivos_validos:
-                    print("  ⚠ Nenhum arquivo válido encontrado")
+                    print(f"  ⚠ Nenhum arquivo válido encontrado na pasta: {self.caminho_pasta_anexos}")
                     return
                 
-                # Lista os arquivos que serão enviados
                 print(f"  📋 Preparando upload de {len(arquivos_validos)} arquivo(s):")
                 for idx, arquivo_path in enumerate(arquivos_validos, 1):
                     print(f"    [{idx}] {os.path.basename(arquivo_path)}")
                 
                 try:
-                    # Envia TODOS os arquivos de uma vez
-                    # Isso evita abrir múltiplos diálogos do macOS
-                    print(f"\n  ⬆️ Enviando todos os arquivos de uma vez...")
+                    # Passo 1: Injeta os arquivos no input
                     await input_file.set_input_files(arquivos_validos)
-                    await page.wait_for_timeout(3000)  # Aguarda upload processar
+                    print(f"\n  ⬆️ Arquivos injetados no campo de upload...")
                     
-                    print(f"  ✅ Upload de {len(arquivos_validos)} arquivo(s) concluído com sucesso!")
+                    # Passo 2: CRÍTICO - Dispara o evento 'change' para o PrimeFaces processar
+                    print(f"  🔄 Disparando evento 'change' para o PrimeFaces...")
+                    await input_file.evaluate('''(element) => {
+                        const event = new Event('change', { bubbles: true });
+                        element.dispatchEvent(event);
+                    }''')
+                    
+                    # Aguarda um pouco para o PrimeFaces reagir
+                    await page.wait_for_timeout(2000)
+                    
+                    # Passo 3: Tenta encontrar e clicar no botão "Enviar" ou "Upload" se existir
+                    botao_upload = await page.query_selector('button.ui-fileupload-upload, button:has-text("Enviar"), button:has-text("Upload")')
+                    if botao_upload:
+                        print(f"  📤 Clicando no botão 'Enviar'...")
+                        await botao_upload.click()
+                        await page.wait_for_timeout(3000)
+                    else:
+                        print(f"  ℹ️ Botão 'Enviar' não encontrado (upload pode ser automático)")
+                        await page.wait_for_timeout(3000)
+                    
+                    print(f"  ✅ Upload finalizado! Verifique se os arquivos apareceram na lista.")
                     
                 except Exception as e:
-                    print(f"  ❌ Erro ao fazer upload dos arquivos: {str(e)}")
+                    print(f"  ❌ Erro durante upload: {str(e)}")
                     import traceback
                     traceback.print_exc()
-                    print("  💡 Você pode fazer o upload manualmente na aba Anexos")
             else:
-                print("  ⚠ Campo de upload não encontrado automaticamente")
-                print("  💡 Por favor, faça o upload manualmente dos arquivos na aba Anexos")
-                print("  💡 Pressione Enter quando terminar...")
-                input()
+                print("  ⚠ Campo de upload NÃO encontrado. O seletor '_input' falhou.")
                 
         except Exception as e:
             print(f"  ❌ Erro ao processar anexos: {str(e)}")
@@ -959,7 +964,7 @@ class MigradorPEP:
     async def preencher_formulario_novo(self, page, dados):
         """
         Preenche o novo formulário (sem protocolo) com os dados extraídos
-        Foca na aba "Serviço" primeiro
+        Foca na aba "Serviço" primeiro e segue a ordem das abas
         """
         print(f"\n📝 Preenchendo novo formulário...")
         print(f"🌐 Acessando: {self.url_nova}")
@@ -967,190 +972,127 @@ class MigradorPEP:
         await page.goto(self.url_nova, wait_until='networkidle')
         await page.wait_for_timeout(3000)  # Aguarda carregamento completo
         
-        # Garante que está na aba "Serviço"
-        print("  🔄 Garantindo que está na aba 'Serviço'...")
+        # --- PASSO 1: ABA SERVIÇO ---
+        print("\n🚀 [PASSO 1] Preenchendo Aba 'Serviço'...")
         try:
             aba_servico = await page.query_selector('a[href="#form:tabs:tabServico"]')
             if aba_servico:
                 await aba_servico.click()
                 await page.wait_for_timeout(1000)
-                print("  ✓ Aba 'Serviço' ativada")
         except:
-            print("  ⚠ Não foi possível ativar a aba 'Serviço' (pode já estar ativa)")
-        
+            pass
+
         campos_preenchidos = 0
         campos_nao_encontrados = []
         
-        # Lista de campos que precisam ser preenchidos em ordem especial (selects dependentes)
-        campos_cascata = ['estadoA', 'municipioA', 'bairroA', 'logradourosA',
-                         'estadoB', 'municipioB', 'bairroB', 'logradourosB',
-                         'estadoItinerario', 'municipioItinerario', 'bairroItinerario', 'logradouroItinerario']
-        
-        # Primeiro, preenche os campos de endereço em cascata (Ponta A e B)
-        print("\n  🏠 Preenchendo endereços em cascata...")
+        # 1.1 Endereços em cascata (Ponta A e B)
+        print("  🏠 Preenchendo endereços em cascata...")
         campos_preenchidos += await self.preencher_cascata_endereco(page, dados, 'A')
         campos_preenchidos += await self.preencher_cascata_endereco(page, dados, 'B')
         
-        # Processa o itinerário (busca e adiciona logradouros)
-        await self.processar_itinerario(page, dados)
+        # Itinerário removido conforme solicitado
+        print("  ℹ️ Pulo do preenchimento de itinerário (removido)")
         
-        # Depois, preenche os demais campos
-        print("\n  📋 Preenchendo demais campos...")
+        # 1.2 Demais campos da aba Serviço (Identificação, Descrição do Cabo, Dados Gerais)
+        print("  📋 Preenchendo Identificação, Cabos e Dados Gerais...")
+        
         campos_cascata_preenchidos = [
             'form:tabs:estadoA', 'form:tabs:municipioA', 'form:tabs:bairroA', 'form:tabs:logradourosA',
             'form:tabs:estadoB', 'form:tabs:municipioB', 'form:tabs:bairroB', 'form:tabs:logradourosB',
             'form:tabs:estadoItinerario', 'form:tabs:municipioItinerario', 
             'form:tabs:bairroItinerario', 'form:tabs:logradouroItinerario',
-            '_itinerario_logradouros'  # Campo interno, não deve ser preenchido
+            '_itinerario_logradouros'
         ]
         
-        # Campos da aba "Dados Cliente" - preencher apenas CNPJ, ignorar os demais
         campos_dados_cliente = [
-            'form:tabs:razaoSocial',
-            'form:tabs:nmFantasia',
-            'form:tabs:nmPessoaContato',
-            'form:tabs:email',
-            'form:tabs:celular',
-            'form:tabs:foneEmergencia',
-            'form:tabs:logradouroPJCompPoste',
-            'form:tabs:nrLogrPJCompPoste',
-            'form:tabs:complementoPJCompPoste',
-            'form:tabs:bairroPJCompPoste',
-            'form:tabs:cepPJCompPoste',
-            'form:tabs:cidadePJCompPoste',
-            'form:tabs:estadoPJCompPoste'
+            'form:tabs:razaoSocial', 'form:tabs:nmFantasia', 'form:tabs:nmPessoaContato',
+            'form:tabs:email', 'form:tabs:celular', 'form:tabs:foneEmergencia',
+            'form:tabs:logradouroPJCompPoste', 'form:tabs:nrLogrPJCompPoste',
+            'form:tabs:complementoPJCompPoste', 'form:tabs:bairroPJCompPoste',
+            'form:tabs:cepPJCompPoste', 'form:tabs:cidadePJCompPoste', 'form:tabs:estadoPJCompPoste'
         ]
-        
-        # Preenche CNPJ primeiro (se existir) e aguarda o sistema preencher os demais campos
-        cnpj_campo = 'form:tabs:cnpjCompPoste'
-        if cnpj_campo in dados and dados[cnpj_campo]:
-            print("\n  👤 Preenchendo CNPJ na aba 'Dados Cliente'...")
-            try:
-                # Ativa a aba "Dados Cliente"
-                aba_cliente = await page.query_selector('a[href="#form:tabs:tabCliente"]')
-                if aba_cliente:
-                    await aba_cliente.click()
-                    await page.wait_for_timeout(1000)
-                    print("  ✓ Aba 'Dados Cliente' ativada")
-                
-                # Preenche o CNPJ
-                campo_cnpj = await page.query_selector(f'input[name="{cnpj_campo}"]')
-                if campo_cnpj:
-                    await campo_cnpj.fill(str(dados[cnpj_campo]))
-                    await page.wait_for_timeout(500)
-                    
-                    # Dispara o evento blur para o sistema buscar os dados automaticamente
-                    # Usa evaluate para chamar blur() no elemento ou pressiona Tab
-                    try:
-                        await campo_cnpj.evaluate('el => el.blur()')
-                    except:
-                        # Se blur() não funcionar, pressiona Tab para sair do campo
-                        await campo_cnpj.press('Tab')
-                    
-                    await page.wait_for_timeout(3000)  # Aguarda o sistema preencher os demais campos
-                    print(f"  ✓ CNPJ preenchido: {dados[cnpj_campo]}")
-                    print("  ✓ Sistema deve preencher os demais campos automaticamente")
-                else:
-                    print(f"  ⚠ Campo CNPJ não encontrado")
-            except Exception as e:
-                print(f"  ⚠ Erro ao preencher CNPJ: {str(e)}")
-        
-        # Se houver pasta de anexos informada, muda para aba Anexos após preencher CNPJ
-        # Caso contrário, volta para aba Serviço para preencher demais campos
-        if self.caminho_pasta_anexos:
-            # Muda para aba Anexos - NÃO preenche mais campos da aba Serviço
-            print("\n  📎 Mudando para aba 'Anexos' após preencher CNPJ...")
-            await self.mudar_para_aba_anexos(page)
-            # Para aqui - os anexos serão processados depois no fluxo principal
-            return campos_preenchidos
-        else:
-            # Volta para a aba "Serviço" para preencher os demais campos
-            try:
-                aba_servico = await page.query_selector('a[href="#form:tabs:tabServico"]')
-                if aba_servico:
-                    await aba_servico.click()
-                    await page.wait_for_timeout(1000)
-            except:
-                pass
-        
+
+        mapeamento_especial = {
+            'fabricante': 'fabricante', 'especificacao': 'especificacao', 'tipo': 'tipo',
+            'massaNominal': 'massaNominal', 'nrFibrasPares': 'nrFibrasPares',
+            'qteEqptosPassivos': 'qteEqptosPassivos', 'qteEqptosAtivos': 'qteEqptosAtivos',
+            'nrPontosExistentes': 'nrPontosExistentes', 'nrPontosNovos': 'nrPontosNovos',
+            'dutos': 'dutos', 'comprimento': 'comprimento'
+        }
+
+        # Loop de preenchimento da Aba Serviço
         for campo, valor in dados.items():
-            # Não ignora campos vazios - alguns campos importantes podem estar vazios mas ainda precisam ser preenchidos
-            # Mas pula se o valor for None ou string vazia após conversão
-            if valor is None or (isinstance(valor, str) and not valor.strip()):
-                continue
-            
-            # Pula campos de cascata que já foram preenchidos e campos internos
-            if campo in campos_cascata_preenchidos:
-                continue
-            
-            # Ignora campos da aba "Dados Cliente" (exceto CNPJ que já foi preenchido)
-            if campo in campos_dados_cliente:
-                continue
-            
-            # Ignora CNPJ (já foi preenchido na aba Dados Cliente)
-            if campo == cnpj_campo:
-                continue
+            if valor is None or (isinstance(valor, str) and not valor.strip()): continue
+            if campo in campos_cascata_preenchidos or campo in campos_dados_cliente or 'cnpj' in campo.lower(): continue
             
             try:
-                # Tenta encontrar o campo por diferentes métodos
+                campo_id_css = campo.replace(":", "\\:")
+                campo_final_name = campo.split(":")[-1]
+                
                 selectors = [
-                    f'input[name="{campo}"]',
-                    f'textarea[name="{campo}"]',
-                    f'select[name="{campo}"]',
-                    f'input#{campo}',
-                    f'textarea#{campo}',
-                    f'select#{campo}',
-                    f'[name="{campo}"]'
+                    f'input[name="{campo}"]', f'textarea[name="{campo}"]', f'select[name="{campo}"]',
+                    f'input#{campo_id_css}', f'textarea#{campo_id_css}', f'select#{campo_id_css}',
+                    f'[name$=":{campo_final_name}"]', f'[id$=":{campo_final_name}"]'
                 ]
                 
+                for chave_esp, seletor_esp in mapeamento_especial.items():
+                    if chave_esp.lower() in campo.lower():
+                        selectors.insert(0, f'[id*="{seletor_esp}"]')
+                        selectors.insert(0, f'[name*="{seletor_esp}"]')
+
                 elemento = None
                 for selector in selectors:
                     try:
                         elemento = await page.query_selector(selector)
-                        if elemento:
-                            break
-                    except:
-                        continue
-                
+                        if elemento: break
+                    except: continue
+
                 if elemento:
                     tag_name = await elemento.evaluate('el => el.tagName.toLowerCase()')
-                    
                     if tag_name == 'select':
-                        # Para selects normais (não dependentes)
-                        try:
-                            await elemento.select_option(value=str(valor))
-                            await page.wait_for_timeout(self.delay)
-                        except:
-                            try:
-                                await elemento.select_option(label=str(valor))
-                                await page.wait_for_timeout(self.delay)
-                            except:
-                                print(f"  ⚠ Não foi possível selecionar valor '{valor}' no select {campo}")
-                                campos_nao_encontrados.append(campo)
-                                continue
+                        try: await elemento.select_option(value=str(valor))
+                        except: await elemento.select_option(label=str(valor))
                     elif tag_name == 'input':
                         input_type = await elemento.get_attribute('type')
                         if input_type in ['checkbox', 'radio']:
-                            if str(valor).lower() in ['true', '1', 'on', 'yes', 'sim']:
-                                await elemento.check()
-                        else:
-                            # Preenche mesmo se vazio (importante para campos como Fabricante, Especificação, etc.)
-                            valor_str = str(valor) if valor else ''
-                            await elemento.fill(valor_str)
+                            if str(valor).lower() in ['true', '1', 'on', 'yes', 'sim']: await elemento.check()
+                        else: await elemento.fill(str(valor))
                     elif tag_name == 'textarea':
-                        # Preenche mesmo se vazio
-                        valor_str = str(valor) if valor else ''
-                        await elemento.fill(valor_str)
+                        await elemento.fill(str(valor))
                     
                     await page.wait_for_timeout(self.delay)
                     campos_preenchidos += 1
-                    print(f"  ✓ {campo} = {valor}")
                 else:
                     campos_nao_encontrados.append(campo)
-                    
-            except Exception as e:
-                print(f"  ⚠ Erro ao preencher {campo}: {str(e)}")
+            except:
                 campos_nao_encontrados.append(campo)
+
+        # --- PASSO 2: ABA DADOS CLIENTE ---
+        print("\n👤 [PASSO 2] Preenchendo Aba 'Dados Cliente'...")
+        cnpj_campo = 'form:tabs:cnpjCompPoste'
+        if cnpj_campo in dados and dados[cnpj_campo]:
+            try:
+                aba_cliente = await page.query_selector('a[href="#form:tabs:tabCliente"]')
+                if aba_cliente:
+                    await aba_cliente.click()
+                    await page.wait_for_timeout(1000)
+                
+                campo_cnpj = await page.query_selector(f'input[name="{cnpj_campo}"]')
+                if campo_cnpj:
+                    await campo_cnpj.fill(str(dados[cnpj_campo]))
+                    await page.wait_for_timeout(1000)
+                    await campo_cnpj.press('Tab')
+                    await page.wait_for_timeout(3000) # Aguarda AJAX
+                    print(f"  ✓ CNPJ preenchido: {dados[cnpj_campo]}")
+            except Exception as e:
+                print(f"  ⚠ Erro no CNPJ: {str(e)}")
+
+        print(f"\n✅ {campos_preenchidos} campos preenchidos na Aba Serviço")
+        return campos_preenchidos
+
+    async def executar_migracao(self):
+        # ... (mantém o resto igual, chamando fazer_upload_anexos depois)
+
         
         print(f"\n✅ {campos_preenchidos} campos preenchidos com sucesso")
         if campos_nao_encontrados:

@@ -8,3 +8,4 @@ python-dotenv==1.0.0
 flask==3.0.0
 greenlet>=3.0.0; platform_system=="Windows"
 
+
